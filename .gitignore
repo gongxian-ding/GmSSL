@@ -14,9 +14,10 @@
 /tmp.*
 /configdata.pm
 /build
+/Makefile
 
 # *all* Makefiles
-Makefile
+#Makefile
 *.tmp
 
 # Java
@@ -183,29 +184,37 @@ Makefile.save
 cscope.*
 *.d
 
+# macOS
+.DS_Store
+*.tar.gz
+
 # add by LiTianjue for GmSSL
 # auto create by Configure
 crypto/opensslconf.h
 tool/c_rehash
 # exec file
 apps/gmssl
+apps/gmca/.ca
 
 # gmtls
 /ssl/ssl_load.c
 
+# demos
+/demos
+/demos/kdf
+/demos/ssl
+/demos/otp
+/demos/sm9
+
 # engines
 /engines/e_skf*
 /engines/e_sdf*
-/engines/e_gmi*
 /engines/sdf
-
-# apps
-/apps/sm2.c
-/apps/sdf.c
-/apps/skf.c
+/engines/skf
 
 include/openssl/srp.h
 
 /*.sh
 
-
+/rust
+/python

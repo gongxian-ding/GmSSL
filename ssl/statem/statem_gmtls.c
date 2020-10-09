@@ -281,7 +281,7 @@ static int gmtls_process_sm9_params(SSL *s, PACKET *pkt, int *al, int ibe)
 	if (!(sm9->params = d2i_SM9PublicParameters(NULL, &p,
 		PACKET_remaining(&params)))) {
 		*al = SSL_AD_DECODE_ERROR;
-		SSLerr(SSL_F_GMTLS_PROCESS_SM9_PARAMS, ERR_R_INTERNAL_ERROR);//这个错误似乎不对
+		SSLerr(SSL_F_GMTLS_PROCESS_SM9_PARAMS, ERR_R_INTERNAL_ERROR);// rename this error
 		return 0;
 	}
 	/* check there is no remaining data */
@@ -492,10 +492,11 @@ static int gmtls_construct_ske_sm2dhe(SSL *s, unsigned char **p, int *l, int *al
 		SSLerr(SSL_F_GMTLS_CONSTRUCT_SKE_SM2DHE, ERR_R_EVP_LIB);
 		goto end;
 	}
-	if (!(id = X509_NAME_oneline(X509_get_subject_name(x509), NULL, 0))) {
-		SSLerr(SSL_F_GMTLS_CONSTRUCT_SKE_SM2DHE, ERR_R_EVP_LIB);
-		goto end;
-	}
+//	if (!(id = X509_NAME_oneline(X509_get_subject_name(x509), NULL, 0))) {
+//		SSLerr(SSL_F_GMTLS_CONSTRUCT_SKE_SM2DHE, ERR_R_EVP_LIB);
+//		goto end;
+//	}
+    id = SM2_DEFAULT_ID;
 	zlen = sizeof(z);
 	if (!SM2_compute_id_digest(EVP_sm3(), id, strlen(id), z, &zlen,
 		EVP_PKEY_get0_EC_KEY(pkey))) {
@@ -525,8 +526,8 @@ static int gmtls_construct_ske_sm2dhe(SSL *s, unsigned char **p, int *l, int *al
         s2n(siglen, d);
 	d += siglen;
 
-	*l += d - *p;		
-	*p = d;			
+	*l += d - *p;
+	*p = d;
 	*al = -1;
 	ret = 1;
 
@@ -597,8 +598,9 @@ static int gmtls_process_ske_sm2dhe(SSL *s, PACKET *pkt, int *al)
 		SSLerr(SSL_F_GMTLS_PROCESS_SKE_SM2DHE, SSL_R_BAD_ECPOINT);
 		goto end;
 	}
-	// s->s3->peer_tmp 需要free吗？出错的话
-			
+
+	// s->s3->peer_tmp need to be free-ed when error happed?
+
 
 	/* get ECDHEParams length */
 	paramslen = PACKET_data(pkt) - ecparams;
@@ -625,11 +627,12 @@ static int gmtls_process_ske_sm2dhe(SSL *s, PACKET *pkt, int *al)
 	}
 
 	/* prepare sm2 z value */
-	if (!(id = X509_NAME_oneline(
-		X509_get_subject_name(s->session->peer), NULL, 0))) {
-		SSLerr(SSL_F_GMTLS_PROCESS_SKE_SM2DHE, ERR_R_EVP_LIB);
-		goto end;
-	}
+//	if (!(id = X509_NAME_oneline(
+//		X509_get_subject_name(s->session->peer), NULL, 0))) {
+//		SSLerr(SSL_F_GMTLS_PROCESS_SKE_SM2DHE, ERR_R_EVP_LIB);
+//		goto end;
+//	}
+    id = SM2_DEFAULT_ID;
 	zlen = sizeof(z);
 	if (!SM2_compute_id_digest(EVP_sm3(), id, strlen(id), z, &zlen,
 		EVP_PKEY_get0_EC_KEY(pkey))) {
@@ -695,7 +698,7 @@ static unsigned char *gmtls_new_cert_packet(X509 *x, int *l)
 
 	p = ret;
 	l2n3(n, p);
-	*l = n;
+	*l = n+3;
 
 end:
 	return ret;
@@ -744,10 +747,11 @@ static int gmtls_construct_ske_sm2(SSL *s, unsigned char **p, int *l, int *al)
 		SSLerr(SSL_F_GMTLS_CONSTRUCT_SKE_SM2, ERR_R_EVP_LIB);
 		goto end;
 	}
-	if (!(id = X509_NAME_oneline(X509_get_subject_name(x509), NULL, 0))) {
-		SSLerr(SSL_F_GMTLS_CONSTRUCT_SKE_SM2, ERR_R_EVP_LIB);
-		goto end;
-	}
+//	if (!(id = X509_NAME_oneline(X509_get_subject_name(x509), NULL, 0))) {
+//		SSLerr(SSL_F_GMTLS_CONSTRUCT_SKE_SM2, ERR_R_EVP_LIB);
+//		goto end;
+//	}
+    id = SM2_DEFAULT_ID;
 	zlen = sizeof(z);
 	if (!SM2_compute_id_digest(EVP_sm3(), id, strlen(id), z, &zlen,
 		EVP_PKEY_get0_EC_KEY(pkey))) {
@@ -801,7 +805,7 @@ static int gmtls_construct_ske_sm2(SSL *s, unsigned char **p, int *l, int *al)
 end:
 	OPENSSL_free(buf);
 	EVP_MD_CTX_free(md_ctx);
-	OPENSSL_free(id);
+	// OPENSSL_free(id);
 	return ret;
 }
 
@@ -864,10 +868,11 @@ static int gmtls_process_ske_sm2(SSL *s, PACKET *pkt, int *al)
 	}
 
 	/* prepare sm2 z value */
-	if (!(id = X509_NAME_oneline(X509_get_subject_name(x509), NULL, 0))) {
-		SSLerr(SSL_F_GMTLS_PROCESS_SKE_SM2, ERR_R_EVP_LIB);
-		goto end;
-	}
+//	if (!(id = X509_NAME_oneline(X509_get_subject_name(x509), NULL, 0))) {
+//		SSLerr(SSL_F_GMTLS_PROCESS_SKE_SM2, ERR_R_EVP_LIB);
+//		goto end;
+//	}
+    id = SM2_DEFAULT_ID;
 	zlen = sizeof(z);
 	if (!SM2_compute_id_digest(EVP_sm3(), id, strlen(id), z, &zlen,
 		EVP_PKEY_get0_EC_KEY(pkey))) {
@@ -902,7 +907,7 @@ static int gmtls_process_ske_sm2(SSL *s, PACKET *pkt, int *al)
 end:
 	OPENSSL_free(buf);
 	EVP_MD_CTX_free(md_ctx);
-	OPENSSL_free(id);
+	// OPENSSL_free(id);
 	return ret;
 }
 
@@ -1338,7 +1343,7 @@ int gmtls_construct_client_certificate(SSL *s)
 	int al = -1;
 	unsigned long alg_a = s->s3->tmp.new_cipher->algorithm_auth;
 	unsigned char *p;
-	int l;
+	int l = 3 + SSL_HM_HEADER_LENGTH(s);
 
 	if (alg_a & SSL_aSM2) {
 		if (!gmtls_construct_sm2_certs(s, &l)) {
@@ -1386,8 +1391,6 @@ MSG_PROCESS_RETURN gmtls_process_client_certificate(SSL *s, PACKET *pkt)
 	return ret;
 }
 
-// SM2密钥交换实际上不仅仅
-// 实际上还需要知道我是客户端还是服务器
 static int gmtls_sm2_derive(SSL *s, EVP_PKEY *privkey, EVP_PKEY *pubkey, int initiator)
 {
 	int ret = 0;
@@ -1461,7 +1464,7 @@ static int gmtls_sm2_derive(SSL *s, EVP_PKEY *privkey, EVP_PKEY *pubkey, int ini
 		goto end;
 	}
 
-	// 如何设定pmslen ??
+	// how to set pmslen ??
 	pmslen = 48;
 
 	/* sm2 key exchange */
@@ -2186,8 +2189,8 @@ int gmtls_construct_client_key_exchange(SSL *s)
 err:
 	if (al != -1)
 		ssl3_send_alert(s, SSL3_AL_FATAL, al);
-	OPENSSL_clear_free(s->s3->tmp.pms, s->s3->tmp.pmslen);				
-	s->s3->tmp.pms = NULL;				
+	OPENSSL_clear_free(s->s3->tmp.pms, s->s3->tmp.pmslen);
+	s->s3->tmp.pms = NULL;
 	ossl_statem_set_error(s);
 	return 0;
 }

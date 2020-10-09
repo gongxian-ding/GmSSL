@@ -113,15 +113,19 @@ int ECIES_PARAMS_init_with_recommended(ECIES_PARAMS *param)
 	}
 
 	memset(param, 0, sizeof(*param));
-#ifndef OPENSSL_NO_SHA
+
+#ifndef OPENSSL_NO_SHA256
 	param->kdf_nid = NID_x9_63_kdf;
 	param->kdf_md = EVP_sha256();
 	param->enc_nid = NID_xor_in_ecies;
 	param->mac_nid = NID_hmac_full_ecies;
 	param->hmac_md = EVP_sha256();
-	// we should return error when sha256 disabled				
-#endif
 	return 1;
+#else
+	ECerr(EC_F_ECIES_PARAMS_INIT_WITH_RECOMMENDED,
+		EC_R_INVALID_ECIES_PARAMS);
+	return 0;
+#endif
 }
 
 KDF_FUNC ECIES_PARAMS_get_kdf(const ECIES_PARAMS *param)
@@ -162,11 +166,6 @@ int ECIES_PARAMS_get_enc(const ECIES_PARAMS *param, size_t inlen,
 		cipher = NULL;
 		keylen = inlen;
 		break;
-#ifndef OPENSSL_NO_DES
-	case NID_tdes_cbc_in_ecies:
-		cipher = EVP_des_ede_cbc();
-		break;
-#endif
 #ifndef OPENSSL_NO_AES
 	case NID_aes128_cbc_in_ecies:
 		cipher = EVP_aes_128_cbc();
@@ -412,7 +411,7 @@ ECIES_CIPHERTEXT_VALUE *ECIES_do_encrypt(const ECIES_PARAMS *param,
 		OPENSSL_assert(pout - ret->ciphertext->data == ciphertextlen);
 
 	} else {
-		unsigned int i;
+		int i;
 		for (i = 0; i < ret->ciphertext->length; i++) {
 			ret->ciphertext->data[i] = in[i] ^ enckey[i];
 		}
@@ -703,10 +702,8 @@ int ECIES_encrypt(int type, const unsigned char *in, size_t inlen,
 		*outlen = (size_t)len;
 		ret = 1;
 		goto end;
-	}
-
-	if (*outlen < len) {
-		ECerr(EC_F_ECIES_ENCRYPT, EC_R_ENCRYPT_FAILED);
+	} else if (*outlen < len) {
+		ECerr(EC_F_ECIES_ENCRYPT, EC_R_BUFFER_TOO_SMALL);
 		*outlen = (size_t)len;
 		goto end;
 	}

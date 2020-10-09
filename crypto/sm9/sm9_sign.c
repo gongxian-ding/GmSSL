@@ -51,14 +51,18 @@
 #include <openssl/err.h>
 #include <openssl/sm9.h>
 #include <openssl/ec.h>
-#include <openssl/ec_type1.h>
-#include <openssl/bn_gfp2.h>
 #include "sm9_lcl.h"
 
 
-int SM9_signature_size(SM9PublicParameters *mpk)
+SM9Signature *SM9_do_sign(const unsigned char *dgst, int dgstlen, SM9_KEY *sm9)
 {
-	return 105;
+	return NULL;
+}
+
+int SM9_do_verify(const unsigned char *dgst, int dgstlen,
+	const SM9Signature *sig, SM9_KEY *sm9)
+{
+	return -1;
 }
 
 int SM9_SignInit(EVP_MD_CTX *ctx, const EVP_MD *md, ENGINE *eng)
@@ -192,6 +196,8 @@ end:
 	BN_free(r);
 	point_cleanup(&Ppubs);
 	fp12_cleanup(w);
+	BN_CTX_end(bn_ctx);
+	BN_CTX_free(bn_ctx);
 	return ret;
 }
 
@@ -349,9 +355,7 @@ end:
 	point_cleanup(&P);
 	fp12_cleanup(w);
 	fp12_cleanup(u);
-	if (bn_ctx) {
-		BN_CTX_end(bn_ctx);
-	}
+	BN_CTX_end(bn_ctx);
 	BN_CTX_free(bn_ctx);
 	return ret;
 }

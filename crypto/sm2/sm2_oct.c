@@ -272,9 +272,12 @@ SM2CiphertextValue *o2i_SM2CiphertextValue(const EC_GROUP *group,
 	/* set result */
 	*pin = p;
 	ret = cv;
+	cv = NULL;
 
 end:
-	SM2CiphertextValue_free(cv);
+	if ((cv != *pout) && (!ret))
+		SM2CiphertextValue_free(cv);
+
 	EC_POINT_free(point);
 	BN_CTX_free(bn_ctx);
 	return ret;

@@ -28,7 +28,6 @@ extern int asn1parse_main(int argc, char *argv[]);
 extern int ca_main(int argc, char *argv[]);
 extern int ciphers_main(int argc, char *argv[]);
 extern int cms_main(int argc, char *argv[]);
-extern int cpk_main(int argc, char *argv[]);
 extern int crl_main(int argc, char *argv[]);
 extern int crl2pkcs7_main(int argc, char *argv[]);
 extern int dgst_main(int argc, char *argv[]);
@@ -44,11 +43,13 @@ extern int exit_main(int argc, char *argv[]);
 extern int gendsa_main(int argc, char *argv[]);
 extern int genpkey_main(int argc, char *argv[]);
 extern int genrsa_main(int argc, char *argv[]);
+extern int gensm9_main(int argc, char *argv[]);
 extern int help_main(int argc, char *argv[]);
 extern int list_main(int argc, char *argv[]);
 extern int nseq_main(int argc, char *argv[]);
 extern int ocsp_main(int argc, char *argv[]);
 extern int otp_main(int argc, char *argv[]);
+extern int paiutl_main(int argc, char *argv[]);
 extern int passwd_main(int argc, char *argv[]);
 extern int pkcs12_main(int argc, char *argv[]);
 extern int pkcs7_main(int argc, char *argv[]);
@@ -65,8 +66,14 @@ extern int rsautl_main(int argc, char *argv[]);
 extern int s_client_main(int argc, char *argv[]);
 extern int s_server_main(int argc, char *argv[]);
 extern int s_time_main(int argc, char *argv[]);
+extern int sdf_main(int argc, char *argv[]);
 extern int sess_id_main(int argc, char *argv[]);
+extern int skf_main(int argc, char *argv[]);
+extern int sm2_main(int argc, char *argv[]);
+extern int sm2utl_main(int argc, char *argv[]);
 extern int sm9_main(int argc, char *argv[]);
+extern int sm9param_main(int argc, char *argv[]);
+extern int sm9utl_main(int argc, char *argv[]);
 extern int smime_main(int argc, char *argv[]);
 extern int speed_main(int argc, char *argv[]);
 extern int spkac_main(int argc, char *argv[]);
@@ -80,7 +87,6 @@ extern OPTIONS asn1parse_options[];
 extern OPTIONS ca_options[];
 extern OPTIONS ciphers_options[];
 extern OPTIONS cms_options[];
-extern OPTIONS cpk_options[];
 extern OPTIONS crl_options[];
 extern OPTIONS crl2pkcs7_options[];
 extern OPTIONS dgst_options[];
@@ -96,11 +102,13 @@ extern OPTIONS exit_options[];
 extern OPTIONS gendsa_options[];
 extern OPTIONS genpkey_options[];
 extern OPTIONS genrsa_options[];
+extern OPTIONS gensm9_options[];
 extern OPTIONS help_options[];
 extern OPTIONS list_options[];
 extern OPTIONS nseq_options[];
 extern OPTIONS ocsp_options[];
 extern OPTIONS otp_options[];
+extern OPTIONS paiutl_options[];
 extern OPTIONS passwd_options[];
 extern OPTIONS pkcs12_options[];
 extern OPTIONS pkcs7_options[];
@@ -117,8 +125,14 @@ extern OPTIONS rsautl_options[];
 extern OPTIONS s_client_options[];
 extern OPTIONS s_server_options[];
 extern OPTIONS s_time_options[];
+extern OPTIONS sdf_options[];
 extern OPTIONS sess_id_options[];
+extern OPTIONS skf_options[];
+extern OPTIONS sm2_options[];
+extern OPTIONS sm2utl_options[];
 extern OPTIONS sm9_options[];
+extern OPTIONS sm9param_options[];
+extern OPTIONS sm9utl_options[];
 extern OPTIONS smime_options[];
 extern OPTIONS speed_options[];
 extern OPTIONS spkac_options[];
@@ -139,9 +153,6 @@ static FUNCTION functions[] = {
 #endif
 #ifndef OPENSSL_NO_CMS
     { FT_general, "cms", cms_main, cms_options },
-#endif
-#ifndef OPENSSL_NO_CPK
-    { FT_general, "cpk", cpk_main, cpk_options },
 #endif
     { FT_general, "crl", crl_main, crl_options },
     { FT_general, "crl2pkcs7", crl2pkcs7_main, crl2pkcs7_options },
@@ -174,6 +185,7 @@ static FUNCTION functions[] = {
 #ifndef OPENSSL_NO_RSA
     { FT_general, "genrsa", genrsa_main, genrsa_options },
 #endif
+    { FT_general, "gensm9", gensm9_main, gensm9_options },
     { FT_general, "help", help_main, help_options },
     { FT_general, "list", list_main, list_options },
     { FT_general, "nseq", nseq_main, nseq_options },
@@ -183,8 +195,9 @@ static FUNCTION functions[] = {
 #ifndef OPENSSL_NO_OTP
     { FT_general, "otp", otp_main, otp_options },
 #endif
+    { FT_general, "paiutl", paiutl_main, paiutl_options },
     { FT_general, "passwd", passwd_main, passwd_options },
-#ifndef OPENSSL_NO_DES
+#ifndef OPENSSL_NO_PKCS12
     { FT_general, "pkcs12", pkcs12_main, pkcs12_options },
 #endif
 #ifndef OPENSSL_NO_PKCS7
@@ -213,10 +226,22 @@ static FUNCTION functions[] = {
 #ifndef OPENSSL_NO_SOCK
     { FT_general, "s_time", s_time_main, s_time_options },
 #endif
+#ifndef OPENSSL_NO_SDF
+    { FT_general, "sdf", sdf_main, sdf_options },
+#endif
     { FT_general, "sess_id", sess_id_main, sess_id_options },
+#ifndef OPENSSL_NO_SKF
+    { FT_general, "skf", skf_main, skf_options },
+#endif
+#ifndef OPENSSL_NO_SM2
+    { FT_general, "sm2", sm2_main, sm2_options },
+#endif
+    { FT_general, "sm2utl", sm2utl_main, sm2utl_options },
 #ifndef OPENSSL_NO_SM9
     { FT_general, "sm9", sm9_main, sm9_options },
 #endif
+    { FT_general, "sm9param", sm9param_main, sm9param_options },
+    { FT_general, "sm9utl", sm9utl_main, sm9utl_options },
     { FT_general, "smime", smime_main, smime_options },
     { FT_general, "speed", speed_main, speed_options },
     { FT_general, "spkac", spkac_main, spkac_options },
@@ -276,6 +301,10 @@ static FUNCTION functions[] = {
 #ifndef OPENSSL_NO_SMS4
     { FT_cipher, "sms4-cfb", enc_main, enc_options },
 #endif
+#ifndef OPENSSL_NO_ZUC
+    { FT_cipher, "zuc", enc_main, enc_options },
+#endif
+    { FT_cipher, "zuc256", enc_main, enc_options },
 #ifndef OPENSSL_NO_AES
     { FT_cipher, "aes-128-cbc", enc_main, enc_options },
 #endif

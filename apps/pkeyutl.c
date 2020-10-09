@@ -199,7 +199,8 @@ int pkeyutl_main(int argc, char **argv)
     if (argc != 0)
         goto opthelp;
 
-    //BIO_printf(bio_err, "Using configuration from %s\n", configfile);
+    if (e)
+        BIO_printf(bio_err, "Using configuration from %s\n", configfile);
 
     if ((conf = app_load_config(configfile)) == NULL)
         goto end;
@@ -336,7 +337,6 @@ int pkeyutl_main(int argc, char **argv)
         BIO_write(out, buf_out, buf_outlen);
 
  end:
-/*
     EVP_PKEY_CTX_free(ctx);
     release_engine(e);
     BIO_free(in);
@@ -346,7 +346,6 @@ int pkeyutl_main(int argc, char **argv)
     OPENSSL_free(sig);
     sk_OPENSSL_STRING_free(pkeyopts);
     NCONF_free(conf);
-*/
     return ret;
 }
 
@@ -502,6 +501,6 @@ static int do_keyop(EVP_PKEY_CTX *ctx, int pkey_op,
         break;
 
     }
-	if (!rv) ERR_print_errors_fp(stderr);
+    if (!rv) ERR_print_errors_fp(stderr);
     return rv;
 }

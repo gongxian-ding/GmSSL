@@ -525,7 +525,8 @@ typedef enum OPTION_choice {
     OPT_4, OPT_6, OPT_HOST, OPT_PORT, OPT_CONNECT, OPT_UNIX,
     OPT_XMPPHOST, OPT_VERIFY,
     OPT_CERT, OPT_CRL, OPT_CRL_DOWNLOAD, OPT_SESS_OUT, OPT_SESS_IN,
-    OPT_CERTFORM, OPT_CRLFORM, OPT_VERIFY_RET_ERROR, OPT_VERIFY_QUIET,
+    OPT_CERTFORM, OPT_CRLFORM, OPT_DCERTFORM, OPT_DCERT, OPT_DKEYFORM,
+    OPT_DKEY, OPT_VERIFY_RET_ERROR, OPT_VERIFY_QUIET,
     OPT_BRIEF, OPT_PREXIT, OPT_CRLF, OPT_QUIET, OPT_NBIO,
     OPT_SSL_CLIENT_ENGINE, OPT_RAND, OPT_IGN_EOF, OPT_NO_IGN_EOF,
     OPT_DEBUG, OPT_TLSEXTDEBUG, OPT_STATUS, OPT_WDEBUG,
@@ -538,7 +539,7 @@ typedef enum OPTION_choice {
     OPT_SRPUSER, OPT_SRPPASS, OPT_SRP_STRENGTH, OPT_SRP_LATEUSER,
     OPT_SRP_MOREGROUPS,
 #endif
-    OPT_SSL3, OPT_SSL_CONFIG,
+    OPT_SSL3, OPT_CONFIG, OPT_SSL_CONFIG,
     OPT_TLS1_2, OPT_TLS1_1, OPT_TLS1, OPT_DTLS, OPT_DTLS1,
     OPT_GMTLS,
     OPT_DTLS1_2, OPT_TIMEOUT, OPT_MTU, OPT_KEYFORM, OPT_PASS,
@@ -581,6 +582,10 @@ OPTIONS s_client_options[] = {
     {"key", OPT_KEY, 's', "Private key file to use, if not in -cert file"},
     {"keyform", OPT_KEYFORM, 'E', "Key format (PEM, DER or engine) PEM default"},
     {"pass", OPT_PASS, 's', "Private key file pass phrase source"},
+    {"dcert", OPT_DCERT, '<', "Second certificate file to use (usually for DSA)"},
+    {"dcertform", OPT_DCERTFORM, 'F', "Second certificate format (PEM or DER) PEM default"},
+    {"dkey", OPT_DKEY, 's', "Second private key file to use (usually for DSA)"},
+    {"dkeyform", OPT_DKEYFORM, 'F', "Second key format (PEM, DER or ENGINE) PEM default"},
     {"CApath", OPT_CAPATH, '/', "PEM format directory of CA's"},
     {"CAfile", OPT_CAFILE, '<', "PEM format file of CA's"},
     {"no-CAfile", OPT_NOCAFILE, '-',
@@ -659,7 +664,8 @@ OPTIONS s_client_options[] = {
     {"alpn", OPT_ALPN, 's',
      "Enable ALPN extension, considering named protocols supported (comma-separated list)"},
     {"async", OPT_ASYNC, '-', "Support asynchronous operation"},
-    {"ssl_config", OPT_SSL_CONFIG, 's', "Use specified configuration file"},
+    {"config", OPT_CONFIG, 's', "Use configuration file"},
+    {"ssl_config", OPT_SSL_CONFIG, 's', "Use specified configuration section"},
     {"split_send_frag", OPT_SPLIT_SEND_FRAG, 'n',
      "Size used to split data for encrypt pipelines"},
     {"max_pipelines", OPT_MAX_PIPELINES, 'n',
@@ -726,7 +732,7 @@ OPTIONS s_client_options[] = {
      "Specify engine to be used for client certificate operations"},
 #endif
 #ifndef OPENSSL_NO_CT
-    {"ct", OPT_CT, '-', "Request and parse SCTs (also enables OCSP stapling)"},
+    {"ct", OPT_CT, '-', "Request and parse SCTs (also enables OCSP stapsection)"},
     {"noct", OPT_NOCT, '-', "Do not request or parse SCTs (default)"},
     {"ctlogfile", OPT_CTLOG_FILE, '<', "CT log list CONF file"},
 #endif
@@ -779,11 +785,11 @@ static void freeandcopy(char **dest, const char *source)
 int s_client_main(int argc, char **argv)
 {
     BIO *sbio;
-    EVP_PKEY *key = NULL;
+    EVP_PKEY *key = NULL, *dkey = NULL;
     SSL *con = NULL;
     SSL_CTX *ctx = NULL;
-    STACK_OF(X509) *chain = NULL;
-    X509 *cert = NULL;
+    STACK_OF(X509) *chain = NULL, *dchain = NULL;
+    X509 *cert = NULL, *dcert = NULL;
     X509_VERIFY_PARAM *vpm = NULL;
     SSL_EXCERT *exc = NULL;
     SSL_CONF_CTX *cctx = NULL;
@@ -797,10 +803,12 @@ int s_client_main(int argc, char **argv)
     char *cbuf = NULL, *sbuf = NULL;
     char *mbuf = NULL, *proxystr = NULL, *connectstr = NULL;
     char *cert_file = NULL, *key_file = NULL, *chain_file = NULL;
+    char *dcert_file = NULL, *dkey_file = NULL, *dchain_file = NULL;
     char *chCApath = NULL, *chCAfile = NULL, *host = NULL;
     char *port = OPENSSL_strdup(PORT);
     char *inrand = NULL;
     char *passarg = NULL, *pass = NULL, *vfyCApath = NULL, *vfyCAfile = NULL;
+    char *dpassarg = NULL, *dpass = NULL;
     char *sess_in = NULL, *sess_out = NULL, *crl_file = NULL, *p;
     char *xmpphost = NULL;
     const char *ehlo = "mail.example.com";
@@ -809,6 +817,7 @@ int s_client_main(int argc, char **argv)
     int noCApath = 0, noCAfile = 0;
     int build_chain = 0, cbuf_len, cbuf_off, cert_format = FORMAT_PEM;
     int key_format = FORMAT_PEM, crlf = 0, full_log = 1, mbuf_len = 0;
+    int dcert_format = FORMAT_PEM, dkey_format = FORMAT_PEM;
     int prexit = 0;
     int sdebug = 0;
     int reconnect = 0, verify = SSL_VERIFY_NONE, vpmtouched = 0;
@@ -838,6 +847,8 @@ int s_client_main(int argc, char **argv)
     char *servername = NULL;
     const char *alpn_in = NULL;
     tlsextctx tlsextcbp = { NULL, 0 };
+    CONF *conf = NULL;
+    const char *configfile = default_config_file;
     const char *ssl_config = NULL;
 #define MAX_SI_TYPES 100
     unsigned short serverinfo_types[MAX_SI_TYPES];
@@ -1004,6 +1015,20 @@ int s_client_main(int argc, char **argv)
             if (!opt_format(opt_arg(), OPT_FMT_PEMDER, &crl_format))
                 goto opthelp;
             break;
+        case OPT_DCERTFORM:
+            if (!opt_format(opt_arg(), OPT_FMT_PEMDER, &dcert_format))
+                goto opthelp;
+            break;
+        case OPT_DCERT:
+            dcert_file = opt_arg();
+            break;
+        case OPT_DKEYFORM:
+            if (!opt_format(opt_arg(), OPT_FMT_PEMDER, &dkey_format))
+                goto opthelp;
+            break;
+        case OPT_DKEY:
+            dkey_file = opt_arg();
+            break;
         case OPT_VERIFY_RET_ERROR:
             verify_args.return_error = 1;
             break;
@@ -1152,6 +1177,9 @@ int s_client_main(int argc, char **argv)
                 min_version = TLS1_VERSION;
             break;
 #endif
+        case OPT_CONFIG:
+            configfile = opt_arg();
+            break;
         case OPT_SSL_CONFIG:
             ssl_config = opt_arg();
             break;
@@ -1347,6 +1375,13 @@ int s_client_main(int argc, char **argv)
     if (argc != 0)
         goto opthelp;
 
+    if (e)
+        BIO_printf(bio_err, "Using configuration from %s\n", configfile);
+    if ((conf = app_load_config(configfile)) == NULL)
+        goto end;
+    if (configfile != default_config_file && !app_load_modules(conf))
+        goto end;
+
     if (proxystr) {
         int res;
         char *tmp_host = host, *tmp_port = port;
@@ -1411,7 +1446,7 @@ int s_client_main(int argc, char **argv)
         next_proto.data = NULL;
 #endif
 
-    if (!app_passwd(passarg, NULL, &pass, NULL)) {
+    if (!app_passwd(passarg, dpassarg, &pass, &dpass)) {
         BIO_printf(bio_err, "Error getting password\n");
         goto end;
     }
@@ -1470,6 +1505,26 @@ int s_client_main(int argc, char **argv)
     if (inrand != NULL) {
         randamt = app_RAND_load_files(inrand);
         BIO_printf(bio_err, "%ld semi-random bytes loaded\n", randamt);
+    }
+
+    if (dcert_file) {
+        if (dkey_file == NULL) {
+            dkey_file = dcert_file;
+        }
+
+        dkey = load_key(dkey_file, dkey_format, 0, dpass, e,
+                        "second certificate private key file");
+        if (!dkey) {
+            ERR_print_errors(bio_err);
+            goto end;
+        }
+
+        dcert = load_cert(dcert_file, dcert_format,
+                            "second server certificate file");
+        if (!dcert) {
+            ERR_print_errors(bio_err);
+            goto end;
+        }
     }
 
     if (bio_c_out == NULL) {
@@ -1641,6 +1696,12 @@ int s_client_main(int argc, char **argv)
 
     if (!set_cert_key_stuff(ctx, cert, key, chain, build_chain))
         goto end;
+
+    if (dcert != NULL) {
+        if (!set_cert_key_stuff(ctx, dcert, dkey, dchain, build_chain)) {
+            goto end;
+        }
+    }
 
     if (servername != NULL) {
         tlsextcbp.biodebug = bio_err;
@@ -2499,10 +2560,14 @@ int s_client_main(int argc, char **argv)
 #endif
     SSL_CTX_free(ctx);
     X509_free(cert);
+    X509_free(dcert);
     sk_X509_CRL_pop_free(crls, X509_CRL_free);
     EVP_PKEY_free(key);
+    EVP_PKEY_free(dkey);
     sk_X509_pop_free(chain, X509_free);
+    sk_X509_pop_free(dchain, X509_free);
     OPENSSL_free(pass);
+    OPENSSL_free(dpass);
 #ifndef OPENSSL_NO_SRP
     OPENSSL_free(srp_arg.srppassin);
 #endif
@@ -2522,6 +2587,7 @@ int s_client_main(int argc, char **argv)
     bio_c_out = NULL;
     BIO_free(bio_c_msg);
     bio_c_msg = NULL;
+    NCONF_free(conf);
     return (ret);
 }
 

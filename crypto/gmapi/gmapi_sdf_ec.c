@@ -110,7 +110,7 @@ int EC_KEY_set_ECCrefPublicKey(EC_KEY *ec_key, const ECCrefPublicKey *ref)
 			ERR_R_PASSED_NULL_PARAMETER);
 		return 0;
 	}
-	if (ref->bits != EC_GROUP_get_degree(EC_KEY_get0_group(ec_key))) {
+	if ((int)ref->bits != EC_GROUP_get_degree(EC_KEY_get0_group(ec_key))) {
 		GMAPIerr(GMAPI_F_EC_KEY_SET_ECCREFPUBLICKEY,
 			GMAPI_R_INVALID_KEY_LENGTH);
 		return 0;
@@ -119,11 +119,11 @@ int EC_KEY_set_ECCrefPublicKey(EC_KEY *ec_key, const ECCrefPublicKey *ref)
 	/* ECCrefPublicKey ==> EC_KEY */
 	nbytes = (ref->bits + 7)/8;
 
-	if (!(x = BN_bin2bn(ref->x, nbytes, NULL))) {
+	if (!(x = BN_bin2bn(ref->x + ECCref_MAX_LEN - nbytes, nbytes, NULL))) {
 		GMAPIerr(GMAPI_F_EC_KEY_SET_ECCREFPUBLICKEY, ERR_R_BN_LIB);
 		goto end;
 	}
-	if (!(y = BN_bin2bn(ref->y, nbytes, NULL))) {
+	if (!(y = BN_bin2bn(ref->y + ECCref_MAX_LEN - nbytes, nbytes, NULL))) {
 		GMAPIerr(GMAPI_F_EC_KEY_SET_ECCREFPUBLICKEY, ERR_R_BN_LIB);
 		goto end;
 	}
@@ -238,7 +238,7 @@ int EC_KEY_set_ECCrefPrivateKey(EC_KEY *ec_key, const ECCrefPrivateKey *ref)
 		return 0;
 	}
 
-	if (ref->bits != EC_GROUP_get_degree(EC_KEY_get0_group(ec_key))) {
+	if ((int)ref->bits != EC_GROUP_get_degree(EC_KEY_get0_group(ec_key))) {
 		GMAPIerr(GMAPI_F_EC_KEY_SET_ECCREFPRIVATEKEY,
 			GMAPI_R_INVALID_KEY_LENGTH);
 		goto end;
@@ -305,7 +305,6 @@ SM2CiphertextValue *SM2CiphertextValue_new_from_ECCCipher(const ECCCipher *ref)
 {
 	SM2CiphertextValue *ret = NULL;
 	SM2CiphertextValue *cv = NULL;
-	EC_GROUP *group = NULL;
 
 	/* check arguments */
 	if (!ref) {
@@ -320,12 +319,6 @@ SM2CiphertextValue *SM2CiphertextValue_new_from_ECCCipher(const ECCCipher *ref)
 	}
 
 	/* ECCCipher => SM2CiphertextValue */
-	if (!(group = EC_GROUP_new_by_curve_name(NID_sm2p256v1))) {
-		GMAPIerr(GMAPI_F_SM2CIPHERTEXTVALUE_NEW_FROM_ECCCIPHER,
-			ERR_R_EC_LIB);
-		goto end;
-	}
-
 	if (!(cv = SM2CiphertextValue_new())) {
 		GMAPIerr(GMAPI_F_SM2CIPHERTEXTVALUE_NEW_FROM_ECCCIPHER,
 			GMAPI_R_MALLOC_FAILED);
@@ -342,7 +335,6 @@ SM2CiphertextValue *SM2CiphertextValue_new_from_ECCCipher(const ECCCipher *ref)
 	cv = NULL;
 
 end:
-	EC_GROUP_free(group);
 	SM2CiphertextValue_free(cv);
 	return ret;
 }
@@ -409,7 +401,7 @@ int SM2CiphertextValue_get_ECCCipher(const SM2CiphertextValue *cv,
 	 * structure and prepared enough buffer to hold variable length
 	 * ciphertext
 	 */
-	if (ref->L < ASN1_STRING_length(cv->ciphertext)) {
+	if (ref->L < (unsigned int)ASN1_STRING_length(cv->ciphertext)) {
 		GMAPIerr(GMAPI_F_SM2CIPHERTEXTVALUE_GET_ECCCIPHER,
 			GMAPI_R_BUFFER_TOO_SMALL);
 		return 0;
@@ -425,10 +417,6 @@ int SM2CiphertextValue_get_ECCCipher(const SM2CiphertextValue *cv,
 		|| BN_num_bytes(cv->yCoordinate) > ECCref_MAX_LEN) {
 		GMAPIerr(GMAPI_F_SM2CIPHERTEXTVALUE_GET_ECCCIPHER,
 			GMAPI_R_INVALID_CIPHERTEXT_POINT);
-		goto end;
-	}
-
-	if (ASN1_STRING_length(cv->hash) != 32) {
 		goto end;
 	}
 
@@ -637,16 +625,6 @@ end:
 	return ret;
 }
 
-ECCCipher *d2i_ECCCipher_bio(BIO *bp, ECCCipher **a)
-{
-	return NULL;
-}
-
-ECCCipher *d2i_ECCCipher_fp(FILE *fp, ECCCipher **a)
-{
-	return NULL;
-}
-
 int i2d_ECCCipher(ECCCipher *a, unsigned char **pp)
 {
 	int ret;
@@ -662,21 +640,17 @@ int i2d_ECCCipher(ECCCipher *a, unsigned char **pp)
 	return ret;
 }
 
-int i2d_ECCCipher_bio(BIO *bp, ECCCipher *a)
-{
-	return 0;
-}
-
-int i2d_ECCCipher_fp(FILE *fp, ECCCipher *a)
-{
-	return 0;
-}
-
 ECCSignature *d2i_ECCSignature(ECCSignature **a, const unsigned char **pp, long length)
 {
 	ECCSignature *ret = NULL;
 	ECCSignature *sdf_sig = NULL;
 	ECDSA_SIG *sig = NULL;
+
+				
+	/* FIXME: `a` not set */
+	(void)a;
+				
+
 
 	if (!(sig = d2i_ECDSA_SIG(NULL, pp, length))) {
 		GMAPIerr(GMAPI_F_D2I_ECCSIGNATURE, ERR_R_EC_LIB);
@@ -702,16 +676,6 @@ end:
 	return ret;
 }
 
-ECCSignature *d2i_ECCSignature_bio(BIO *bp, ECCSignature **a)
-{
-	return NULL;
-}
-
-ECCSignature *d2i_ECCSignature_fp(FILE *fp, ECCSignature **a)
-{
-	return NULL;
-}
-
 int i2d_ECCSignature(ECCSignature *a, unsigned char **pp)
 {
 	int ret;
@@ -725,16 +689,6 @@ int i2d_ECCSignature(ECCSignature *a, unsigned char **pp)
 	ret = i2d_ECDSA_SIG(sig, pp);
 	ECDSA_SIG_free(sig);
 	return ret;
-}
-
-int i2d_ECCSignature_bio(BIO *bp, ECCSignature *a)
-{
-	return 0;
-}
-
-int i2d_ECCSignature_fp(FILE *fp, ECCSignature *a)
-{
-	return 0;
 }
 
 # ifndef OPENSSL_NO_ECIES

@@ -56,15 +56,6 @@
 #include <openssl/crypto.h>
 #include "sm9_lcl.h"
 
-/*
-int SM9_do_wrap_key(const EVP_MD *kdf_md
-	unsigned char *key, size_t keylen, EC_POINT *C,
-	SM9PublicKey *pk);
-
-int SM9_do_unwrap_key(const EVP_MD *kdf_md,
-	unsigned char *key, size_t keylen, const EC_POINT *C,
-	SM9PublicKey *pk);
-*/
 
 int SM9_unwrap_key(int type,
 	unsigned char *key, size_t keylen,
@@ -82,7 +73,7 @@ int SM9_unwrap_key(int type,
 	const EVP_MD *kdf_md;
 	unsigned char wbuf[384];
 	unsigned char *out = key;
-	size_t outlen = keylen;	
+	size_t outlen = keylen;
 	unsigned char counter[4] = {0, 0, 0, 1};
 	unsigned char dgst[64];
 	unsigned int len;
@@ -132,7 +123,7 @@ int SM9_unwrap_key(int type,
 	if (!fp12_to_bin(w, wbuf)) {
 		SM9err(SM9_F_SM9_UNWRAP_KEY, ERR_R_MALLOC_FAILURE);
 		goto end;
-	}	
+	}
 
 	/* K = KDF(C||w||ID_B, klen) */
 	while (outlen > 0) {
@@ -205,7 +196,7 @@ int SM9_wrap_key(int type, /* NID_sm9kdf_with_sm3 */
 		return 0;
 	}
 
-	if (keylen > EVP_MD_size(kdf_md) * 255) {
+	if (keylen > (size_t)EVP_MD_size(kdf_md) * 255) {
 		SM9err(SM9_F_SM9_WRAP_KEY, SM9_R_INVALID_KEM_KEY_LENGTH);
 		return 0;
 	}
@@ -261,7 +252,7 @@ int SM9_wrap_key(int type, /* NID_sm9kdf_with_sm3 */
 
 	do {
 		unsigned char *out = key;
-		size_t outlen = keylen;	
+		size_t outlen = keylen;
 		unsigned char counter[4] = {0, 0, 0, 1};
 		unsigned int len;
 
@@ -352,7 +343,8 @@ int SM9_encrypt(int type,
 	size_t C1_len;
 	unsigned char mac[EVP_MAX_MD_SIZE];
 	unsigned int maclen = sizeof(mac);
-	int len, i;
+	int len;
+	size_t i;
 
 	/* parse type */
 	switch (type) {
@@ -436,7 +428,7 @@ int SM9_decrypt(int type,
 	int C2_len;
 	unsigned char mac[EVP_MAX_MD_SIZE];
 	unsigned int maclen = sizeof(mac);
-	int len, i;
+	int i;
 
 	/* parse type */
 	switch (type) {
@@ -456,6 +448,11 @@ int SM9_decrypt(int type,
 		return 0;
 	}
 
+	if (!in || !outlen || !sk) {
+		SM9err(SM9_F_SM9_DECRYPT, ERR_R_PASSED_NULL_PARAMETER);
+		goto end;
+	}
+
 	/* decode sm9 ciphertext */
 	if (!(sm9cipher = d2i_SM9Ciphertext(NULL, &in, inlen))) {
 		SM9err(SM9_F_SM9_DECRYPT, ERR_R_SM9_LIB);
@@ -464,9 +461,13 @@ int SM9_decrypt(int type,
 	C2 = ASN1_STRING_get0_data(sm9cipher->c2);
 	C2_len = ASN1_STRING_length(sm9cipher->c2);
 
-	/* check mac length */
-	if (ASN1_STRING_length(sm9cipher->c3) != EVP_MD_size(md)) {
-		SM9err(SM9_F_SM9_DECRYPT, ERR_R_SM9_LIB);
+	/* check/return output length */
+	if (!out) {
+		*outlen = C2_len;
+		ret = 1;
+		goto end;
+	} else if (*outlen < (size_t)C2_len) {
+		SM9err(SM9_F_SM9_DECRYPT, SM9_R_BUFFER_TOO_SMALL);
 		goto end;
 	}
 
@@ -489,6 +490,12 @@ int SM9_decrypt(int type,
 	}
 	*outlen = C2_len;
 
+	/* check mac length */
+	if (ASN1_STRING_length(sm9cipher->c3) != EVP_MD_size(md)) {
+		SM9err(SM9_F_SM9_DECRYPT, ERR_R_SM9_LIB);
+		goto end;
+	}
+
 	/* C3 = Hv(C2||K2) */
 	memcpy(key, C2, C2_len);
 	if (!EVP_Digest(key, keylen, mac, &maclen, md, NULL)) {
@@ -505,6 +512,7 @@ int SM9_decrypt(int type,
 
 end:
 	SM9Ciphertext_free(sm9cipher);
-	OPENSSL_clear_free(key, keylen);
+	if (key)
+		OPENSSL_clear_free(key, keylen);
 	return ret;
 }

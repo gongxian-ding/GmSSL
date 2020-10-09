@@ -84,7 +84,7 @@ int EC_KEY_set_ECCPUBLICKEYBLOB(EC_KEY *ec_key, const ECCPUBLICKEYBLOB *blob)
 	BIGNUM *x = NULL;
 	BIGNUM *y = NULL;
 
-	if (blob->BitLen != EC_GROUP_get_degree(EC_KEY_get0_group(ec_key))) {
+	if ((int)blob->BitLen != EC_GROUP_get_degree(EC_KEY_get0_group(ec_key))) {
 		GMAPIerr(GMAPI_F_EC_KEY_SET_ECCPUBLICKEYBLOB, GMAPI_R_INVALID_KEY_LENGTH);
 		return 0;
 	}
@@ -186,7 +186,7 @@ int EC_KEY_set_ECCPRIVATEKEYBLOB(EC_KEY *ec_key, const ECCPRIVATEKEYBLOB *blob)
 	int ret = 0;
 	BIGNUM *d = NULL;
 
-	if (blob->BitLen != EC_GROUP_get_degree(EC_KEY_get0_group(ec_key))) {
+	if ((int)blob->BitLen != EC_GROUP_get_degree(EC_KEY_get0_group(ec_key))) {
 		GMAPIerr(GMAPI_F_EC_KEY_SET_ECCPRIVATEKEYBLOB, GMAPI_R_INVALID_KEY_LENGTH);
 		goto end;
 	}
@@ -309,7 +309,7 @@ int SM2CiphertextValue_get_ECCCIPHERBLOB(const SM2CiphertextValue *cv,
 		return 0;
 	}
 
-	if (blob->CipherLen < ASN1_STRING_length(cv->ciphertext)) {
+	if (blob->CipherLen < (unsigned int)ASN1_STRING_length(cv->ciphertext)) {
 		GMAPIerr(GMAPI_F_SM2CIPHERTEXTVALUE_GET_ECCCIPHERBLOB,
 			GMAPI_R_BUFFER_TOO_SMALL);
 		return 0;
@@ -360,8 +360,8 @@ ECDSA_SIG *ECDSA_SIG_new_from_ECCSIGNATUREBLOB(const ECCSIGNATUREBLOB *blob)
 
 int ECDSA_SIG_set_ECCSIGNATUREBLOB(ECDSA_SIG *sig, const ECCSIGNATUREBLOB *blob)
 {
-	OPENSSL_assert(sig->r);
-	OPENSSL_assert(sig->s);
+//	OPENSSL_assert(sig->r);
+//	OPENSSL_assert(sig->s);
 
 	if (!(sig->r = BN_bin2bn(blob->r, sizeof(blob->r), sig->r))) {
 		GMAPIerr(GMAPI_F_ECDSA_SIG_SET_ECCSIGNATUREBLOB, ERR_R_BN_LIB);
@@ -378,7 +378,8 @@ int ECDSA_SIG_set_ECCSIGNATUREBLOB(ECDSA_SIG *sig, const ECCSIGNATUREBLOB *blob)
 
 int ECDSA_SIG_get_ECCSIGNATUREBLOB(const ECDSA_SIG *sig, ECCSIGNATUREBLOB *blob)
 {
-	if ((BN_num_bytes(sig->r) > sizeof(blob->r)) || (BN_num_bytes(sig->s) > sizeof(blob->s))) {
+	if (((size_t)BN_num_bytes(sig->r) > sizeof(blob->r))
+		|| ((size_t)BN_num_bytes(sig->s) > sizeof(blob->s))) {
 		GMAPIerr(GMAPI_F_ECDSA_SIG_GET_ECCSIGNATUREBLOB, GMAPI_R_INVALID_BIGNUM_LENGTH);
 		return 0;
 	}
@@ -545,13 +546,13 @@ int ECIES_CIPHERTEXT_VALUE_get_ECCCIPHERBLOB(const ECIES_CIPHERTEXT_VALUE *cv, E
 		goto end;
 	}
 
-	if (BN_num_bytes(x) > sizeof(blob->XCoordinate)) {
+	if ((size_t)BN_num_bytes(x) > sizeof(blob->XCoordinate)) {
 		GMAPIerr(GMAPI_F_ECIES_CIPHERTEXT_VALUE_GET_ECCCIPHERBLOB, GMAPI_R_INVALID_SKF_EC_CIPHERTEXT);
 		goto end;
 	}
 	BN_bn2bin(x, blob->XCoordinate + sizeof(blob->XCoordinate) - BN_num_bytes(x));
 
-	if (BN_num_bytes(y) > sizeof(blob->YCoordinate)) {
+	if ((size_t)BN_num_bytes(y) > sizeof(blob->YCoordinate)) {
 		GMAPIerr(GMAPI_F_ECIES_CIPHERTEXT_VALUE_GET_ECCCIPHERBLOB, GMAPI_R_INVALID_SKF_EC_CIPHERTEXT);
 		goto end;
 	}
@@ -585,6 +586,9 @@ ECCCIPHERBLOB *d2i_ECCCIPHERBLOB(ECCCIPHERBLOB **a, const unsigned char **pp, lo
 	ECCCIPHERBLOB *blob = NULL;
 	SM2CiphertextValue *cv = NULL;
 
+	/* FIXME: set `a` */
+	(void)a;
+
 	if (!(cv = d2i_SM2CiphertextValue(NULL, pp, length))) {
 		GMAPIerr(GMAPI_F_D2I_ECCCIPHERBLOB, ERR_R_SM2_LIB);
 		goto end;
@@ -601,6 +605,7 @@ ECCCIPHERBLOB *d2i_ECCCIPHERBLOB(ECCCIPHERBLOB **a, const unsigned char **pp, lo
 		goto end;
 	}
 
+			
 	ret = blob;
 	blob = NULL;
 
@@ -620,23 +625,9 @@ int i2d_ECCCIPHERBLOB(ECCCIPHERBLOB *a, unsigned char **pp)
 		return 0;
 	}
 
-	if ((ret = i2d_SM2CiphertextValue(cv, pp)) <= 0) {
-	}
-
+	ret = i2d_SM2CiphertextValue(cv, pp);
 	SM2CiphertextValue_free(cv);
 	return ret;
-}
-
-ECCCIPHERBLOB *d2i_ECCCIPHERBLOB_bio(BIO *bp, ECCCIPHERBLOB **a)
-{
-	GMAPIerr(GMAPI_F_D2I_ECCCIPHERBLOB_BIO, GMAPI_R_NOT_IMPLEMENTED);
-	return NULL;
-}
-
-int i2d_ECCCIPHERBLOB_bio(BIO *bp, ECCCIPHERBLOB *a)
-{
-	GMAPIerr(GMAPI_F_I2D_ECCCIPHERBLOB_BIO, GMAPI_R_NOT_IMPLEMENTED);
-	return 0;
 }
 
 ECCSIGNATUREBLOB *d2i_ECCSIGNATUREBLOB(ECCSIGNATUREBLOB **a, const unsigned char **pp, long length)
@@ -644,6 +635,9 @@ ECCSIGNATUREBLOB *d2i_ECCSIGNATUREBLOB(ECCSIGNATUREBLOB **a, const unsigned char
 	ECCSIGNATUREBLOB *ret = NULL;
 	ECCSIGNATUREBLOB *blob = NULL;
 	ECDSA_SIG *sig = NULL;
+
+	/* FIXME: set `a` */
+	(void)a;
 
 	if (!(sig = d2i_ECDSA_SIG(NULL, pp, length))) {
 		GMAPIerr(GMAPI_F_D2I_ECCSIGNATUREBLOB, ERR_R_EC_LIB);
@@ -659,6 +653,8 @@ ECCSIGNATUREBLOB *d2i_ECCSIGNATUREBLOB(ECCSIGNATUREBLOB **a, const unsigned char
 		GMAPIerr(GMAPI_F_D2I_ECCSIGNATUREBLOB, ERR_R_GMAPI_LIB);
 		goto end;
 	}
+
+	// a not used 					
 
 	ret = blob;
 	blob = NULL;
@@ -683,42 +679,4 @@ int i2d_ECCSIGNATUREBLOB(ECCSIGNATUREBLOB *a, unsigned char **pp)
 	ECDSA_SIG_free(sig);
 	return ret;
 }
-
-ECCSIGNATUREBLOB *d2i_ECCSIGNATUREBLOB_bio(BIO *bp, ECCSIGNATUREBLOB **a)
-{
-	GMAPIerr(GMAPI_F_D2I_ECCSIGNATUREBLOB_BIO, GMAPI_R_NOT_IMPLEMENTED);
-	return NULL;
-}
-
-int i2d_ECCSIGNATUREBLOB_bio(BIO *fp, ECCSIGNATUREBLOB *a)
-{
-	GMAPIerr(GMAPI_F_I2D_ECCSIGNATUREBLOB_BIO, GMAPI_R_NOT_IMPLEMENTED);
-	return 0;
-}
-
-# ifndef OPENSSL_NO_STDIO
-ECCCIPHERBLOB *d2i_ECCCIPHERBLOB_fp(FILE *fp, ECCCIPHERBLOB **a)
-{
-	GMAPIerr(GMAPI_F_D2I_ECCCIPHERBLOB_FP, GMAPI_R_NOT_IMPLEMENTED);
-	return NULL;
-}
-
-int i2d_ECCCIPHERBLOB_fp(FILE *fp, ECCCIPHERBLOB *a)
-{
-	GMAPIerr(GMAPI_F_I2D_ECCCIPHERBLOB_FP, GMAPI_R_NOT_IMPLEMENTED);
-	return 0;
-}
-
-ECCSIGNATUREBLOB *d2i_ECCSIGNATUREBLOB_fp(FILE *fp, ECCSIGNATUREBLOB **a)
-{
-	GMAPIerr(GMAPI_F_D2I_ECCSIGNATUREBLOB_FP, GMAPI_R_NOT_IMPLEMENTED);
-	return NULL;
-}
-
-int i2d_ECCSIGNATUREBLOB_fp(FILE *fp, ECCSIGNATUREBLOB *a)
-{
-	GMAPIerr(GMAPI_F_I2D_ECCSIGNATUREBLOB_FP, GMAPI_R_NOT_IMPLEMENTED);
-	return 0;
-}
-# endif /* OPENSSL_NO_STDIO */
 #endif
